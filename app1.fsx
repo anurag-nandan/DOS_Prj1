@@ -20,6 +20,7 @@ let range_N=fsi.CommandLineArgs.[1]|> int64;
 let length_k=fsi.CommandLineArgs.[2]|> int64;
 
 let choices = new System.Collections.Generic.Queue<int64>()
+
 for i = 1 to (range_N)|>int do
     choices.Enqueue(i|>int64)
     
@@ -55,8 +56,8 @@ let sub_actor system name=
                                 }
                             loop()
 
-
-
+let mutable last_reached = false
+let mutable flag = false
 let Master_Actor = spawn system "M_Actor" <| fun mailbox ->
         let Actor =  
             [1..4]
@@ -67,32 +68,39 @@ let Master_Actor = spawn system "M_Actor" <| fun mailbox ->
                 let! message = mailbox.Receive()
                 match message with
                 |Start->
-                       for i = 0 to 3 do 
+                        for i = 0 to 3 do 
                             if choices.Count <> 0 then
                                 let q_val:int64 = choices.Dequeue()
                                 Actor.[i].Tell(Initiate_exe q_val)
+                                if q_val = range_N then
+                                    last_reached <- true
                             
                     
                 |Verify response -> if (response <> -1L) then printfn "%d" response
-                                    if choices.Count <> 0 then
-                                        mailbox.Sender().Tell(Initiate_exe (choices.Dequeue()))
-                            
-                        
+                                    if last_reached = true then
+                                        flag <- false
+                                    else
+                                        if choices.Count <> 0 then
+                                            let q_val:int64 = choices.Dequeue()
+                                            mailbox.Sender().Tell(Initiate_exe q_val)
+                                            if q_val = range_N then
+                                                last_reached <- true
 
+                
                 return! loop()
             }
         loop()
 
-
-
 let M_Actor = system.ActorSelection("akka://MainActor/user/M_Actor")
 #time
-M_Actor.Tell(Start)
+if range_N > 0L then
+    if length_k > 0L then
+        M_Actor.Tell(Start)
 
-let mutable flag = true
-while flag do
-    if choices.Count=0 then
-        flag <- false
+        flag <- true
+        while flag do
+            if choices.Count=0 then
+                flag <- false
 
 #time
 
